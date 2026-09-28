@@ -12,6 +12,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var lastError: String?
     private var lastKnownModels: [String] = []
 
+    private var menuIsOpen = false
+    private var renderedSignature = ""   // state the open menu was built from
+    private var memoryItem: NSMenuItem?  // updated in place so an open submenu isn't disturbed
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         menu.delegate = self
@@ -30,18 +34,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func refresh() {
         Task { @MainActor in
-            let snap = await controller.snapshot()
-            snapshot = snap
-            if let models = snap.status?.models.map(\.id), !models.isEmpty { lastKnownModels = models }
-            updateIcon()
+            apply(await controller.snapshot())
+            render()
         }
+    }
+
+    private func apply(_ snap: Controller.Snapshot) {
+        snapshot = snap
+        if let models = snap.status?.models.map(\.id), !models.isEmpty { lastKnownModels = models }
+    }
+
+    /// Fetches state off the main thread, waiting at most `timeout` so opening the
+    /// menu never hangs. Returns nil if oMLX didn't answer in time.
+    private func fetchSnapshot(waitingAtMost timeout: TimeInterval) -> Controller.Snapshot? {
+        final class Box: @unchecked Sendable { var value: Controller.Snapshot? }
+        let box = Box()
+        let done = DispatchSemaphore(value: 0)
+        let controller = self.controller
+        Task.detached {
+            box.value = await controller.snapshot()
+            done.signal()
+        }
+        return done.wait(timeout: .now() + timeout) == .success ? box.value : nil
+    }
+
+    /// Updates the icon, and the menu too if it's open and what it shows has changed.
+    private func render() {
+        updateIcon()
+        guard menuIsOpen else { return }
+        if signature() != renderedSignature {
+            rebuildMenu()
+        } else {
+            memoryItem?.title = memoryText()
+        }
+    }
+
+    /// Everything the menu shows except the memory figure, which changes constantly while loading.
+    private func signature() -> String {
+        let models = (snapshot.status?.models ?? []).map { "\($0.id):\($0.loaded):\($0.isLoading)" }
+        return ([headline(), "\(snapshot.running)", lastError ?? "", busy ?? ""] + models).joined(separator: "|")
+    }
+
+    private func memoryText() -> String {
+        guard let status = snapshot.status else { return "" }
+        return "Memory in use: \(formatBytes(status.currentModelMemory)) of \(formatBytes(status.maxModelMemory))"
     }
 
     private func perform(_ label: String, _ action: @escaping () async throws -> Void) {
         guard busy == nil else { return }
         busy = label
         lastError = nil
-        updateIcon()
+        render()
         Task { @MainActor in
             do {
                 try await action()
@@ -49,9 +92,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 lastError = error.localizedDescription
             }
             busy = nil
-            let snap = await controller.snapshot()
-            snapshot = snap
-            updateIcon()
+            apply(await controller.snapshot())
+            render()
         }
     }
 
@@ -81,18 +123,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Menu
 
     func menuWillOpen(_ menu: NSMenu) {
+        menuIsOpen = true
+        // Show current state, not the last poll (up to 3 s old). If oMLX is slow to
+        // answer, open with the cached state; the next poll updates the open menu.
+        if let fresh = fetchSnapshot(waitingAtMost: 0.3) { apply(fresh) }
+        updateIcon()
         rebuildMenu()
-        refresh()
+    }
+
+    func menuDidClose(_ menu: NSMenu) {
+        menuIsOpen = false
     }
 
     private func rebuildMenu() {
         menu.removeAllItems()
+        renderedSignature = signature()
+        memoryItem = nil
         let idle = busy == nil
         let status = snapshot.status
 
         menu.addItem(info(headline()))
-        if snapshot.running, let status {
-            menu.addItem(info("Memory in use: \(formatBytes(status.currentModelMemory)) of \(formatBytes(status.maxModelMemory))"))
+        if snapshot.running, status != nil {
+            let item = info(memoryText())
+            memoryItem = item
+            menu.addItem(item)
         }
         if let lastError {
             menu.addItem(info("⚠︎ \(lastError)"))
@@ -185,7 +239,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 Task { @MainActor in
                     guard self.busy != nil else { return } // action already finished
                     self.busy = step
-                    self.updateIcon()
+                    self.render()
                 }
             }
         }
@@ -209,7 +263,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         } catch {
             lastError = "Couldn't change login item: \(error.localizedDescription)"
-            updateIcon()
+            render()
         }
     }
 
