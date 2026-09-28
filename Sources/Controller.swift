@@ -56,7 +56,9 @@ final class Controller {
     }
 }
 
+/// Binary gigabytes (1024³), the unit macOS uses for RAM, so figures compare
+/// directly with "128 GB" in About This Mac and Activity Monitor.
 func formatBytes(_ bytes: Int64?) -> String {
     guard let bytes else { return "?" }
-    return String(format: "%.1f GB", Double(bytes) / 1_000_000_000)
+    return String(format: "%.1f GB", Double(bytes) / 1_073_741_824)
 }
