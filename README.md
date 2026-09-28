@@ -46,3 +46,7 @@ The self-test runs the app's own controller code against the live server using a
 - **Port and model folder:** read from `~/.omlx/settings.json`.
 
 Don't stop oMLX by killing the process. The brew launch agent has `KeepAlive` on, so launchd restarts it immediately.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

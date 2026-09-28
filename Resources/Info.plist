@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.alvinleung.omlx-loader</string>
+    <string>com.mifuneson2.omlx-loader</string>
     <key>CFBundleName</key>
     <string>oMLX Loader</string>
     <key>CFBundleDisplayName</key>
