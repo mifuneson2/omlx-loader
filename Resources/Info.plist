@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.alvinleung.omlx-loader</string>
+    <key>CFBundleName</key>
+    <string>oMLX Loader</string>
+    <key>CFBundleDisplayName</key>
+    <string>oMLX Loader</string>
+    <key>CFBundleExecutable</key>
+    <string>oMLXLoader</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <!-- Menu bar only: no Dock icon, no app menu -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- oMLX is plain HTTP on 127.0.0.1 -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
+</dict>
+</plist>
